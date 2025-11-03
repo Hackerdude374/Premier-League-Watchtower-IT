@@ -39,3 +39,7 @@ docker compose exec backend pytest -q
 docker compose down
 docker compose up --build -d
 docker compose exec backend pytest -q
+
+
+http://localhost:8080/
+

@@ -7,7 +7,7 @@ pipeline {
 
   environment {
     // change to your Docker Hub namespace
-    DOCKERHUB_NS = 'yourdockerhubusername'
+    DOCKERHUB_NS = 'Hackerdude374'
     // image names
     BACKEND_IMG  = "${DOCKERHUB_NS}/backend"
     FRONTEND_IMG = "${DOCKERHUB_NS}/frontend"
