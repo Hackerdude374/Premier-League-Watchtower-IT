@@ -14,16 +14,40 @@ type Row = {
   goal_diff: number;
 };
 
+
+
 export default function Standings() {
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchStandings();
+      setRows(data);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshData = async () => {
+    try {
+      setRefreshing(true);
+      await fetch("/standings/refresh", { method: "POST" });
+      await load();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    fetchStandings()
-      .then(data => setRows(data))
-      .catch(e => setErr(String(e)))
-      .finally(() => setLoading(false));
+    load();
   }, []);
 
   if (loading) return <div className="p-6">Loading…</div>;
@@ -31,7 +55,16 @@ export default function Standings() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Premier League Standings</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Premier League Standings</h1>
+        <button
+          onClick={refreshData}
+          disabled={refreshing}
+          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full text-sm">
@@ -47,13 +80,17 @@ export default function Standings() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
+            {rows.map((r) => (
               <tr key={r.team.id} className="border-t">
                 <td className="p-2">{r.position}</td>
                 <td className="p-2 flex items-center gap-2">
-                  {r.team.crest ? <img src={r.team.crest} alt="" width={20} /> : null}
+                  {r.team.crest && (
+                    <img src={r.team.crest} alt={r.team.name} width={20} />
+                  )}
                   <span>{r.team.name}</span>
-                  {r.team.tla ? <span className="text-gray-500">({r.team.tla})</span> : null}
+                  {r.team.tla && (
+                    <span className="text-gray-500">({r.team.tla})</span>
+                  )}
                 </td>
                 <td className="p-2">{r.points}</td>
                 <td className="p-2">{r.won}</td>
@@ -67,7 +104,7 @@ export default function Standings() {
       </div>
 
       <p className="text-xs text-gray-500 mt-2">
-        Data cached from the football-data.org API by your FastAPI backend.
+        Data cached from football-data.org via your FastAPI backend.
       </p>
     </div>
   );
