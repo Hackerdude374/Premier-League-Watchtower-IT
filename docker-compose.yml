@@ -6,15 +6,14 @@ services:
       POSTGRES_USER: pl_user
       POSTGRES_PASSWORD: pl_pass
       POSTGRES_DB: pl_db
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pl_user -d pl_db"]
       interval: 5s
       timeout: 3s
       retries: 20
     volumes:
-      - db_data:/var/lib/postgresql/data   # keep data between restarts
+      - db_data:/var/lib/postgresql/data
 
   backend:
     build: ./backend
@@ -26,12 +25,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    ports: ["8000:8000"]
     restart: unless-stopped
-    # optional: mount code for live reloads during dev
-    # volumes:
-    #   - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    container_name: plwatchtower-frontend
+    depends_on:
+      - backend
+    ports: ["5173:80"]   # visit http://localhost:5173 in prod too
+    restart: unless-stopped
 
 volumes:
   db_data:

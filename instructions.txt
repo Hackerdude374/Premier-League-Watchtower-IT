@@ -31,3 +31,7 @@ curl.exe http://localhost:8000/health
 
 Invoke-WebRequest -Uri "http://localhost:8000/standings/refresh" -Method POST | Select-Object -ExpandProperty Content
 Invoke-WebRequest -Uri "http://localhost:8000/standings" | Select-Object -ExpandProperty Content
+
+Run IT bnackend py tests for testing 
+
+docker compose exec backend pytest -q
