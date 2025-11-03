@@ -2,3 +2,27 @@ docker compose up --build
 
 
 in ROOT FOLDER
+
+Powershell post commands 
+
+
+PowerShell’s curl is an alias for Invoke-WebRequest, so -X errors out.
+
+POST refresh (PowerShell)
+
+
+Invoke-WebRequest -Uri "http://localhost:8000/standings/refresh" -Method POST | Select-Object -ExpandProperty Content
+
+
+GET health
+
+
+Invoke-WebRequest -Uri "http://localhost:8000/health" | Select-Object -ExpandProperty Content
+
+
+Or use real curl:
+
+curl.exe -X POST http://localhost:8000/standings/refresh
+curl.exe http://localhost:8000/health
+
+
