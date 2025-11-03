@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 from app.db.session import Base, engine
 from app.routes import health, standings
+from app.config import settings
 
-# create tables on startup (simple for now; Alembic later)
+# --- Validate critical env vars ---
+if not settings.FOOTBALL_API_KEY:
+    raise RuntimeError("Missing FOOTBALL_DATA_API_KEY environment variable")
+
+# --- Create DB tables on startup (simple for now) ---
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="PL Watchtower")

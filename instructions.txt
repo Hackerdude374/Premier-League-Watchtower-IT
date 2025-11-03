@@ -26,3 +26,5 @@ curl.exe -X POST http://localhost:8000/standings/refresh
 curl.exe http://localhost:8000/health
 
 
+Invoke-WebRequest -Uri "http://localhost:8000/standings/refresh" -Method POST | Select-Object -ExpandProperty Content
+Invoke-WebRequest -Uri "http://localhost:8000/standings" | Select-Object -ExpandProperty Content

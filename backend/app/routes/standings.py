@@ -6,8 +6,7 @@ from app.services.football_data import fetch_pl_standings_json, parse_standings
 
 router = APIRouter(prefix="/standings", tags=["standings"])
 
-@router.post("/refresh")
-from fastapi.responses import JSONResponse
+
 
 @router.post("/refresh")
 def refresh_standings(db: Session = Depends(get_db)):
