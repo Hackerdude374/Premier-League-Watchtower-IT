@@ -1,5 +1,6 @@
+// src/pages/Standings.tsx
 import { useEffect, useState } from "react";
-import { fetchStandings } from "../services/api";
+import ThemeToggle from "../components/ThemeToggle";
 
 type Team = { id: number; name: string; tla?: string; crest?: string };
 type Row = {
@@ -14,21 +15,22 @@ type Row = {
   goal_diff: number;
 };
 
-
-
 export default function Standings() {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const load = async () => {
     try {
       setLoading(true);
-      const data = await fetchStandings();
+      const res = await fetch("/standings/"); // proxied to :8000 in vite.config.ts
+      if (!res.ok) throw new Error(`GET /standings failed: ${res.status}`);
+      const data = await res.json();
       setRows(data);
-    } catch (e) {
-      setErr(String(e));
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
     } finally {
       setLoading(false);
     }
@@ -37,75 +39,113 @@ export default function Standings() {
   const refreshData = async () => {
     try {
       setRefreshing(true);
-      await fetch("/standings/refresh", { method: "POST" });
+      const res = await fetch("/standings/refresh", { method: "POST" });
+      // backend may return { ok, inserted, last_updated? }
+      try {
+        const body = await res.json();
+        if (body?.last_updated) setLastUpdated(body.last_updated);
+      } catch { /* ignore if not JSON */ }
       await load();
-    } catch (e) {
-      setErr(String(e));
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
     } finally {
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  if (loading) return <div className="p-6">Loading…</div>;
-  if (err) return <div className="p-6 text-red-600">Error: {err}</div>;
+  useEffect(() => { load(); }, []);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Premier League Standings</h1>
-        <button
-          onClick={refreshData}
-          disabled={refreshing}
-          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-gray-100">
+      {/* gradient header card */}
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="rounded-2xl p-6 mb-6 shadow-lg
+                        bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-500
+                        text-white">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold drop-shadow">
+              Premier League Standings
+            </h1>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={refreshData}
+                disabled={refreshing}
+                className="px-3 py-2 rounded-lg bg-white/90 text-gray-900
+                           hover:bg-white disabled:opacity-60 transition"
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+          {lastUpdated && (
+            <p className="text-sm mt-2 text-white/90">
+              Last updated: {new Date(lastUpdated).toLocaleString()}
+            </p>
+          )}
+        </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="p-2">Pos</th>
-              <th className="p-2">Team</th>
-              <th className="p-2">Pts</th>
-              <th className="p-2">W</th>
-              <th className="p-2">D</th>
-              <th className="p-2">L</th>
-              <th className="p-2">GD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.team.id} className="border-t">
-                <td className="p-2">{r.position}</td>
-                <td className="p-2 flex items-center gap-2">
-                  {r.team.crest && (
-                    <img src={r.team.crest} alt={r.team.name} width={20} />
-                  )}
-                  <span>{r.team.name}</span>
-                  {r.team.tla && (
-                    <span className="text-gray-500">({r.team.tla})</span>
-                  )}
-                </td>
-                <td className="p-2">{r.points}</td>
-                <td className="p-2">{r.won}</td>
-                <td className="p-2">{r.draw}</td>
-                <td className="p-2">{r.lost}</td>
-                <td className="p-2">{r.goal_diff}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        {/* content card */}
+        <div className="bg-white dark:bg-neutral-800/80 backdrop-blur rounded-xl
+                        border border-gray-200 dark:border-neutral-700 shadow">
+          {loading ? (
+            <div className="p-8 flex justify-center">
+              <div className="animate-spin h-8 w-8 border-4 border-white/30 dark:border-white/20 border-t-transparent rounded-full" />
+            </div>
+          ) : err ? (
+            <div className="p-6 text-red-400">{err}</div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-neutral-800/60 text-left
+                                  text-gray-600 dark:text-gray-300 sticky top-0">
+                  <tr>
+                    <th className="p-2">Pos</th>
+                    <th className="p-2">Team</th>
+                    <th className="p-2">Pts</th>
+                    <th className="p-2">W</th>
+                    <th className="p-2">D</th>
+                    <th className="p-2">L</th>
+                    <th className="p-2">GD</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-800 dark:text-gray-100">
+                  {rows.map((r) => (
+                    <tr
+                      key={r.team.id}
+                      className="border-t border-gray-200 dark:border-neutral-700
+                                 hover:bg-gray-100/60 dark:hover:bg-neutral-800
+                                 transition-colors"
+                    >
+                      <td className="p-2">{r.position}</td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          {r.team.crest ? (
+                            <img src={r.team.crest} alt="" width={20} height={20} />
+                          ) : null}
+                          <span>{r.team.name}</span>
+                          {r.team.tla ? (
+                            <span className="text-gray-500">({r.team.tla})</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="p-2">{r.points}</td>
+                      <td className="p-2">{r.won}</td>
+                      <td className="p-2">{r.draw}</td>
+                      <td className="p-2">{r.lost}</td>
+                      <td className="p-2">{r.goal_diff}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-      <p className="text-xs text-gray-500 mt-2">
-        Data cached from football-data.org via your FastAPI backend.
-      </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+          Data cached from football-data.org by your FastAPI backend.
+        </p>
+      </div>
     </div>
   );
 }

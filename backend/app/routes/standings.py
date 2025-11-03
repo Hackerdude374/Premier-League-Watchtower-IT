@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db import models
 from app.services.football_data import fetch_pl_standings_json, parse_standings
-
+from datetime import datetime, timezone
 router = APIRouter(prefix="/standings", tags=["standings"])
 
 from fastapi.responses import JSONResponse
@@ -47,7 +47,10 @@ def refresh_standings(db: Session = Depends(get_db)):
             ))
 
         db.commit()
-        return JSONResponse(status_code=201, content={"ok": True, "inserted": len(rows)})
+        return JSONResponse(
+    status_code=201,
+    content={"ok": True, "inserted": len(rows), "last_updated": datetime.now(timezone.utc).isoformat()}
+)
 
     except Exception as e:
         db.rollback()
