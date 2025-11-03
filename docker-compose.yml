@@ -1,0 +1,25 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: pl_user
+      POSTGRES_PASSWORD: pl_pass
+      POSTGRES_DB: pl_db
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pl_user -d pl_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://pl_user:pl_pass@db:5432/pl_db
+      FOOTBALL_DATA_API_KEY: ${FOOTBALL_DATA_API_KEY}
+      LEAGUE_CODE: PL
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["8000:8000"]
