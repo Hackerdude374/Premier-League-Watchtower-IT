@@ -40,6 +40,12 @@ docker compose down
 docker compose up --build -d
 docker compose exec backend pytest -q
 
+Jenkinslink 
+
 
 http://localhost:8080/
 
+https://eastamerica.cloudflare.jenkins.io/current/update-center.json 
+https://eastamerica.cloudflare.jenkins.io/current/update-center.json
+
+^put this as the link for the plugin store
