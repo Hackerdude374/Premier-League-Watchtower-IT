@@ -3,7 +3,11 @@ from app.config import settings
 
 def fetch_pl_standings_json():
     url = f"{settings.FOOTBALL_API_BASE}/competitions/{settings.LEAGUE_CODE}/standings"
-    headers = {"X-Auth-Token": settings.FOOTBALL_API_KEY}
+    headers = {
+    "X-Auth-Token": settings.FOOTBALL_API_KEY,
+    "User-Agent": "PLWatchtower/1.0 (contact@example.com)"
+}
+
     r = requests.get(url, headers=headers, timeout=15)
     r.raise_for_status()
     return r.json()
