@@ -1,27 +1,21 @@
 pipeline {
   agent any
-  options {
-    timestamps()
-    ansiColor('xterm')
-  }
+  options { timestamps(); ansiColor('xterm') }
 
   environment {
-    // your Docker Hub namespace
     DOCKERHUB_NS = 'hackerdude374'
     BACKEND_IMG  = "${DOCKERHUB_NS}/backend"
     FRONTEND_IMG = "${DOCKERHUB_NS}/frontend"
+    COMPOSE_PROJECT_NAME = 'plwatchtower' // optional, keeps names stable on Windows
   }
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Compute Version') {
       steps {
-        // get short git sha into env.GIT_SHA (Windows)
         script {
           env.GIT_SHA = bat(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         }
@@ -31,20 +25,21 @@ pipeline {
 
     stage('Backend Tests (Docker Compose)') {
       steps {
-        // run docker compose using PowerShell; wait for DB health
         powershell '''
+          $ErrorActionPreference = "Stop"
           docker compose build backend db
           docker compose up -d db
 
           Write-Host "Waiting for DB health..."
-          for ($i = 0; $i -lt 30; $i++) {
-            $state = docker compose ps --format "{{.Name}} {{.State}}"
-            if ($state -match "plwatchtower-db.*healthy") { break }
+          for ($i = 0; $i -lt 40; $i++) {
+            $ps = docker compose ps --format json | ConvertFrom-Json
+            $db = $ps | Where-Object { $_.Service -eq "db" }
+            if ($db -and $db.State -match "healthy") { break }
             Start-Sleep -Seconds 2
           }
 
           docker compose run --rm backend pytest -q
-          docker compose down
+          docker compose down -v
         '''
       }
     }
@@ -52,11 +47,12 @@ pipeline {
     stage('Build Images') {
       steps {
         powershell '''
-          docker build -t "$env:BACKEND_IMG:$env:GIT_SHA"  backend
-          docker build -t "$env:FRONTEND_IMG:$env:GIT_SHA" frontend
+          $ErrorActionPreference = "Stop"
+          docker build -t "$Env:BACKEND_IMG:$Env:GIT_SHA"  backend
+          docker build -t "$Env:FRONTEND_IMG:$Env:GIT_SHA" frontend
 
-          docker tag "$env:BACKEND_IMG:$env:GIT_SHA"  "$env:BACKEND_IMG:latest"
-          docker tag "$env:FRONTEND_IMG:$env:GIT_SHA" "$env:FRONTEND_IMG:latest"
+          docker tag "$Env:BACKEND_IMG:$Env:GIT_SHA"  "$Env:BACKEND_IMG:latest"
+          docker tag "$Env:FRONTEND_IMG:$Env:GIT_SHA" "$Env:FRONTEND_IMG:latest"
         '''
       }
     }
@@ -65,13 +61,12 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
           powershell '''
-            $env:DOCKER_PASS | docker login -u $env:DOCKER_USER --password-stdin
-
-            docker push "$env:BACKEND_IMG:$env:GIT_SHA"
-            docker push "$env:FRONTEND_IMG:$env:GIT_SHA"
-            docker push "$env:BACKEND_IMG:latest"
-            docker push "$env:FRONTEND_IMG:latest"
-
+            $ErrorActionPreference = "Stop"
+            $Env:DOCKER_PASS | docker login --username $Env:DOCKER_USER --password-stdin
+            docker push "$Env:BACKEND_IMG:$Env:GIT_SHA"
+            docker push "$Env:FRONTEND_IMG:$Env:GIT_SHA"
+            docker push "$Env:BACKEND_IMG:latest"
+            docker push "$Env:FRONTEND_IMG:latest"
             docker logout
           '''
         }
@@ -83,6 +78,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'aws-keys', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
           powershell '''
+            $ErrorActionPreference = "Stop"
             cd infra
             terraform init -input=false
             terraform plan -out=tfplan -input=false
@@ -95,8 +91,7 @@ pipeline {
 
   post {
     always {
-      powershell 'docker compose down 2>$null; exit 0'
-      powershell 'docker system prune -f'
+      powershell '$ErrorActionPreference="SilentlyContinue"; docker compose down -v 2>$null; docker system prune -f'
     }
   }
 }
