@@ -1,7 +1,10 @@
+docker compose down
 docker compose up --build
 
 
 in ROOT FOLDER
+docker compose down -v
+to reset database ^ dont do this if not needed 
 
 Powershell post commands 
 

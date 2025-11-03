@@ -6,7 +6,11 @@ from app.services.football_data import fetch_pl_standings_json, parse_standings
 
 router = APIRouter(prefix="/standings", tags=["standings"])
 
+from fastapi.responses import JSONResponse
+from sqlalchemy import delete
+import logging
 
+log = logging.getLogger("plwatchtower")
 
 @router.post("/refresh")
 def refresh_standings(db: Session = Depends(get_db)):
@@ -17,35 +21,40 @@ def refresh_standings(db: Session = Depends(get_db)):
         if not rows:
             return JSONResponse(status_code=200, content={"ok": True, "inserted": 0})
 
-        # --- Clean old standings for this season ---
         season = rows[0]["season"]
-        db.query(models.Standing).filter(models.Standing.season == season).delete()
+
+        # delete old season rows
+        db.execute(delete(models.Standing).where(models.Standing.season == season))
         db.commit()
 
-        # --- Upsert teams and insert new standings ---
+        # upsert teams
         for row in rows:
             t = row["team"]
             team = db.get(models.Team, t["id"])
             if not team:
-                team = models.Team(id=t["id"], name=t["name"], tla=t["tla"], crest=t["crest"])
-                db.add(team)
+                db.add(models.Team(id=t["id"], name=t["name"], tla=t["tla"], crest=t["crest"]))
             else:
                 team.name, team.tla, team.crest = t["name"], t["tla"], t["crest"]
+        db.flush()  # ensure team rows exist before standings
 
-            s = row["standing"]
-            st = models.Standing(
+        # insert standings
+        for row in rows:
+            s, t = row["standing"], row["team"]
+            db.add(models.Standing(
                 season=season, team_id=t["id"], position=s["position"],
                 played=s["played"], won=s["won"], draw=s["draw"],
                 lost=s["lost"], points=s["points"], goal_diff=s["goal_diff"]
-            )
-            db.add(st)
+            ))
 
         db.commit()
         return JSONResponse(status_code=201, content={"ok": True, "inserted": len(rows)})
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        log.exception("refresh_standings failed")
+        # bubble precise message to help you debug
+        raise HTTPException(status_code=502, detail=f"Refresh failed: {e}")
+
 
 @router.get("/")
 def get_current_standings(db: Session = Depends(get_db)):

@@ -4,13 +4,15 @@ from app.config import settings
 def fetch_pl_standings_json():
     url = f"{settings.FOOTBALL_API_BASE}/competitions/{settings.LEAGUE_CODE}/standings"
     headers = {
-    "X-Auth-Token": settings.FOOTBALL_API_KEY,
-    "User-Agent": "PLWatchtower/1.0 (contact@example.com)"
-}
-
+        "X-Auth-Token": settings.FOOTBALL_API_KEY,
+        "User-Agent": "PLWatchtower/1.0 (mailto:you@example.com)"
+    }
     r = requests.get(url, headers=headers, timeout=15)
-    r.raise_for_status()
+    # don't raise yet—let caller handle with detail
+    if r.status_code >= 400:
+        raise RuntimeError(f"Upstream {r.status_code}: {r.text[:400]}")
     return r.json()
+
 
 def parse_standings(json_obj):
     """Return a list of dict rows to insert into DB."""
