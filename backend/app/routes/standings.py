@@ -7,12 +7,23 @@ from app.services.football_data import fetch_pl_standings_json, parse_standings
 router = APIRouter(prefix="/standings", tags=["standings"])
 
 @router.post("/refresh")
+from fastapi.responses import JSONResponse
+
+@router.post("/refresh")
 def refresh_standings(db: Session = Depends(get_db)):
     try:
         data = fetch_pl_standings_json()
         rows = parse_standings(data)
 
-        # upsert teams then standings (simple: insert if not exists)
+        if not rows:
+            return JSONResponse(status_code=200, content={"ok": True, "inserted": 0})
+
+        # --- Clean old standings for this season ---
+        season = rows[0]["season"]
+        db.query(models.Standing).filter(models.Standing.season == season).delete()
+        db.commit()
+
+        # --- Upsert teams and insert new standings ---
         for row in rows:
             t = row["team"]
             team = db.get(models.Team, t["id"])
@@ -24,14 +35,15 @@ def refresh_standings(db: Session = Depends(get_db)):
 
             s = row["standing"]
             st = models.Standing(
-                season=row["season"], team_id=t["id"], position=s["position"],
+                season=season, team_id=t["id"], position=s["position"],
                 played=s["played"], won=s["won"], draw=s["draw"],
                 lost=s["lost"], points=s["points"], goal_diff=s["goal_diff"]
             )
             db.add(st)
 
         db.commit()
-        return {"ok": True, "inserted": len(rows)}
+        return JSONResponse(status_code=201, content={"ok": True, "inserted": len(rows)})
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
